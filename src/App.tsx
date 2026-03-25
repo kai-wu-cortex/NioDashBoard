@@ -610,7 +610,7 @@ const App: React.FC = () => {
         </div>
 
         {/* Row 1 - 3 widgets */}
-        <div className="flex gap-[16px] mb-[16px]">
+        <div id="widget-row-1" className="flex gap-[16px] mb-[16px]">
           <div ref={widgetRefs.battery}>
             <BatteryWidget
               isCharging={widgetData.isCharging}
@@ -643,7 +643,7 @@ const App: React.FC = () => {
         </div>
 
         {/* Row 2 - 4 widgets */}
-        <div className="flex gap-[16px] mb-[16px]">
+        <div id="widget-row-2" className="flex gap-[16px] mb-[16px]">
           <div ref={widgetRefs.fotaVersion}>
             <FOTAVersionWidget
               currentVersion={widgetData.fotaVersion}
@@ -678,7 +678,7 @@ const App: React.FC = () => {
         </div>
 
         {/* Row 3 - 4 widgets */}
-        <div className="flex gap-[16px] mb-[32px]">
+        <div id="widget-row-3" className="flex gap-[16px] mb-[32px]">
           <div ref={widgetRefs.vehicleInfo}>
             <VehicleInfoWidget
               totalMileage={widgetData.totalMileage}

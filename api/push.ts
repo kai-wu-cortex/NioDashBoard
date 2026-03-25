@@ -4,22 +4,22 @@ import chromium from '@sparticuz/chromium';
 import fs from 'fs';
 import path from 'path';
 
-// 11 widgets distributed across 3 rows
+// 11 widgets distributed across 3 rows (using IDs for precise selection)
 const WIDGET_SELECTORS = [
   // Row 1 (3 widgets)
-  '.flex:nth-child(2) > div:nth-child(1) > div', // battery
-  '.flex:nth-child(2) > div:nth-child(2) > div', // doorsWindows
-  '.flex:nth-child(2) > div:nth-child(3) > div', // vehicleDoors
+  '#widget-row-1 > div:nth-child(1) > div', // battery
+  '#widget-row-1 > div:nth-child(2) > div', // doorsWindows
+  '#widget-row-1 > div:nth-child(3) > div', // vehicleDoors
   // Row 2 (4 widgets)
-  '.flex:nth-child(3) > div:nth-child(1) > div', // fotaVersion
-  '.flex:nth-child(3) > div:nth-child(2) > div', // gps
-  '.flex:nth-child(3) > div:nth-child(3) > div', // specialModes
-  '.flex:nth-child(3) > div:nth-child(4) > div', // charging
+  '#widget-row-2 > div:nth-child(1) > div', // fotaVersion
+  '#widget-row-2 > div:nth-child(2) > div', // gps
+  '#widget-row-2 > div:nth-child(3) > div', // specialModes
+  '#widget-row-2 > div:nth-child(4) > div', // charging
   // Row 3 (4 widgets)
-  '.flex:nth-child(4) > div:nth-child(1) > div', // vehicleInfo
-  '.flex:nth-child(4) > div:nth-child(2) > div', // seatHeating
-  '.flex:nth-child(4) > div:nth-child(3) > div', // connection
-  '.flex:nth-child(4) > div:nth-child(4) > div', // temperature
+  '#widget-row-3 > div:nth-child(1) > div', // vehicleInfo
+  '#widget-row-3 > div:nth-child(2) > div', // seatHeating
+  '#widget-row-3 > div:nth-child(3) > div', // connection
+  '#widget-row-3 > div:nth-child(4) > div', // temperature
 ];
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
