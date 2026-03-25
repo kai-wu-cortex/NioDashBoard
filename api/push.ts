@@ -123,21 +123,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // INLINE JS and CSS directly into HTML to avoid network requests
     // This guarantees React loads immediately without depending on network
-    // Extract asset filenames from HTML
-    const jsMatch = html.match(/src="\/assets\/([^"]+)"/);
-    const cssMatch = html.match(/href="\/assets\/([^"]+)"/);
+    // Extract asset filenames from HTML - use more robust matching
+    const jsMatch = /src\s*=\s*"\/assets\/([^"]+)"/.exec(html);
+    const cssMatch = /href\s*=\s*"\/assets\/([^"]+)"/.exec(html);
 
     if (jsMatch) {
       const jsPath = path.join(process.cwd(), 'dist', 'assets', jsMatch[1]);
       const jsContent = fs.readFileSync(jsPath, 'utf8');
-      html = html.replace(/<script[^>]+src="\/assets\/[^"]+"<\/script>/, `<script type="module">${jsContent}</script>`);
+      // Use more robust regex to match the full script tag
+      html = html.replace(/<script[^>]+src\s*=\s*"\/assets\/[^"]+"[^>]*><\/script>/, `<script type="module">${jsContent}</script>`);
       console.log(`✓ Inlined JS (${(jsContent.length / 1024 / 1024).toFixed(2)} MB)`);
     }
 
     if (cssMatch) {
       const cssPath = path.join(process.cwd(), 'dist', 'assets', cssMatch[1]);
       const cssContent = fs.readFileSync(cssPath, 'utf8');
-      html = html.replace(/<link[^>]+href="\/assets\/[^"]+"[^>]*>/, `<style>${cssContent}</style>`);
+      html = html.replace(/<link[^>]+href\s*=\s*"\/assets\/[^"]+"[^>]*>/, `<style>${cssContent}</style>`);
       console.log(`✓ Inlined CSS (${(cssContent.length / 1024).toFixed(2)} KB)`);
     }
 
