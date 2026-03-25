@@ -162,6 +162,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Check if all widget IDs exist
     const hasFirstWidget = pageHtml.includes('widget-battery');
     console.log('✓ widget-battery id found:', hasFirstWidget);
+    // Full HTML output for debugging when missing
+    if (!hasFirstWidget) {
+      console.log('⚠️ FULL HTML DUMP:');
+      console.log(pageHtml);
+    }
     console.log('=== PAGE HTML DEBUG END ===');
 
     // Wait for the first widget to render with increased timeout
