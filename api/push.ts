@@ -116,14 +116,29 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const indexPath = path.join(process.cwd(), 'dist', 'index.html');
     let html = fs.readFileSync(indexPath, 'utf8');
 
-    // Add base tag to fix asset paths when loading via data URI
-    // CSS/JS paths like /assets/... will resolve correctly to the production domain
-    const baseTag = '<base href="https://niothing.pintecl.com/">\n';
+    // INLINE JS and CSS directly into HTML to avoid network requests
+    // This guarantees React loads immediately without depending on network
+    // Extract asset filenames from HTML
+    const jsMatch = html.match(/src="\/assets\/([^"]+)"/);
+    const cssMatch = html.match(/href="\/assets\/([^"]+)"/);
+
+    if (jsMatch) {
+      const jsPath = path.join(process.cwd(), 'dist', 'assets', jsMatch[1]);
+      const jsContent = fs.readFileSync(jsPath, 'utf8');
+      html = html.replace(/<script[^>]+src="\/assets\/[^"]+"<\/script>/, `<script type="module">${jsContent}</script>`);
+      console.log(`✓ Inlined JS (${(jsContent.length / 1024 / 1024).toFixed(2)} MB)`);
+    }
+
+    if (cssMatch) {
+      const cssPath = path.join(process.cwd(), 'dist', 'assets', cssMatch[1]);
+      const cssContent = fs.readFileSync(cssPath, 'utf8');
+      html = html.replace(/<link[^>]+href="\/assets\/[^"]+"[^>]*>/, `<style>${cssContent}</style>`);
+      console.log(`✓ Inlined CSS (${(cssContent.length / 1024).toFixed(2)} KB)`);
+    }
+
     // Inject NIO data directly into HTML BEFORE loading page
     // This ensures React sees the data when it initializes
     const injectionScript = `<script>window.__NIO_RAW_DATA__ = ${JSON.stringify(nioData).replace(/</g, '\\u003c')};</script>`;
-    // Add base tag in head before closing </head>
-    html = html.replace('</head>', `${baseTag}</head>`);
     // Add injection script before closing </body>
     html = html.replace('</body>', `${injectionScript}</body>`);
 
