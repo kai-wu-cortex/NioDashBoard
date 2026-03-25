@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import html2canvas from 'html2canvas';
 import BatteryWidget from './components/BatteryWidget';
 import DoorsWindowsWidget from './components/DoorsWindowsWidget';
@@ -11,7 +11,7 @@ import SeatHeatingWidget from './components/SeatHeatingWidget';
 import ConnectionWidget from './components/ConnectionWidget';
 import TemperatureWidget from './components/TemperatureWidget';
 import ChargingWidget from './components/ChargingWidget';
-import { NIOWidgetData, GeneratedImage } from './types';
+import { GeneratedImage } from './types';
 
 interface WidgetDataState {
   // Battery
@@ -149,6 +149,21 @@ const App: React.FC = () => {
   const [generating, setGenerating] = useState(false);
   const [updating, setUpdating] = useState(false);
   const [lastUpdate, setLastUpdate] = useState<string>('');
+  const [apiKey, setApiKey] = useState<string>(() => {
+    return localStorage.getItem('nio_dashboard_apikey') || '';
+  });
+  const [deviceId, setDeviceId] = useState<string>(() => {
+    return localStorage.getItem('nio_dashboard_deviceid') || 'quote/0';
+  });
+  const [pushing, setPushing] = useState(false);
+  const [pushResult, setPushResult] = useState<string>('');
+  const [border, setBorder] = useState<number>(() => {
+    const saved = localStorage.getItem('nio_dashboard_border');
+    return saved ? Number(saved) : 1;
+  });
+  const [ditherType, setDitherType] = useState<string>(() => {
+    return localStorage.getItem('nio_dashboard_dither') || 'DIFFUSION';
+  });
 
   // Refs for each widget (for screenshot)
   const widgetRefs = {
@@ -179,6 +194,91 @@ const App: React.FC = () => {
     { ref: widgetRefs.charging, name: '充电信息' },
   ];
 
+  // Check if we have pre-injected data from puppeteer (API push scenario)
+  useEffect(() => {
+    if ((window as any).__NIO_RAW_DATA__?.result_code === 'success' && (window as any).__NIO_RAW_DATA__.data) {
+      const apiData = (window as any).__NIO_RAW_DATA__.data;
+      console.log('Using pre-injected NIO data from puppeteer', apiData);
+
+      // Map API data to our state
+      setWidgetData(prev => ({
+        ...prev,
+        // Battery
+        batterySoc: apiData.status?.soc_status?.soc ?? prev.batterySoc,
+        batteryRange: apiData.status?.soc_status?.remaining_actual_range ?? prev.batteryRange,
+        totalMileage: apiData.status?.exterior_status?.mileage ?? prev.totalMileage,
+        isCharging: (apiData.status?.soc_status?.charge_state ?? 0) === 1.0,
+
+        // GPS
+        gpsLongitude: apiData.status?.position_status?.longitude ?? prev.gpsLongitude,
+        gpsLatitude: apiData.status?.position_status?.latitude ?? prev.gpsLatitude,
+
+        // Special Modes
+        petMode: (apiData.status?.offcar_mode_status?.pet_mode ?? 0) > 0,
+        powerHoldMode: (apiData.status?.offcar_mode_status?.power_hold_mode ?? 0) > 0,
+        campingMode: (apiData.status?.offcar_mode_status?.camping_mode ?? 0) > 0,
+        defenderMode: (apiData.status?.offcar_mode_status?.defender_mode ?? 0) > 0,
+        remoteVideo: (apiData.status?.offcar_mode_status?.remote_video ?? 0) > 0,
+
+        // Temperature
+        insideTemp: apiData.status?.climate_status?.inside_temp ?? prev.insideTemp,
+        outsideTemp: apiData.status?.climate_status?.outside_temp ?? prev.outsideTemp,
+        acOn: apiData.status?.climate_status?.ac_on ?? prev.acOn,
+
+        // Seat Heating & Ventilation
+        steeringWheelHeat: apiData.status?.climate_status?.steering_wheel_heat_level ?? 0,
+        frontLeftHeat: apiData.status?.climate_status?.front_left_heat_level ?? 0,
+        frontRightHeat: apiData.status?.climate_status?.front_right_heat_level ?? 0,
+        rearLeftHeat: apiData.status?.climate_status?.rear_left_heat_level ?? 0,
+        rearRightHeat: apiData.status?.climate_status?.rear_right_heat_level ?? 0,
+        thirdRowLeftHeat: apiData.status?.climate_status?.third_row_left_heat_level ?? 0,
+        thirdRowRightHeat: apiData.status?.climate_status?.third_row_right_heat_level ?? 0,
+        frontLeftVent: apiData.status?.climate_status?.front_left_vent_level ?? 0,
+        frontRightVent: apiData.status?.climate_status?.front_right_vent_level ?? 0,
+        rearLeftVent: apiData.status?.climate_status?.rear_left_vent_level ?? 0,
+        rearRightVent: apiData.status?.climate_status?.rear_right_vent_level ?? 0,
+
+        // Charging info
+        chargingPower: apiData.status?.soc_status?.charging_power ?? 0,
+        chargingCurrent: apiData.status?.soc_status?.charging_current ?? 0,
+        chargingVoltage: apiData.status?.soc_status?.charging_voltage ?? 0,
+        chrgReq: apiData.status?.soc_status?.chrg_req ?? 0,
+
+        // Connection
+        cdcConnected: apiData.status?.connection_status?.cdc_connected ?? true,
+        adcConnected: apiData.status?.connection_status?.adc_connected ?? true,
+        accountId: apiData.status?.connection_status?.account_id ?? prev.accountId,
+
+        // FOTA
+        fotaVersion: apiData.status?.fota_status?.current_version ?? prev.fotaVersion,
+        fotaPartNumber: apiData.status?.fota_status?.current_part_number ?? prev.fotaPartNumber,
+        fotaIsLatest: !(apiData.status?.fota_status?.available_update ?? false),
+
+        // Windows
+        frontLeftWindow: apiData.status?.door_status?.front_left_window ?? 0,
+        frontRightWindow: apiData.status?.door_status?.front_right_window ?? 0,
+        rearLeftWindow: apiData.status?.door_status?.rear_left_window ?? 0,
+        rearRightWindow: apiData.status?.door_status?.rear_right_window ?? 0,
+        frontTrunk: apiData.status?.door_status?.front_trunk ?? 0,
+
+        // Door status (1.0 = 关门, 0.0 = 开门)
+        doorFrontLeft: apiData.status?.door_status?.front_left_door ?? 1.0,
+        doorFrontRight: apiData.status?.door_status?.front_right_door ?? 1.0,
+        doorRearLeft: apiData.status?.door_status?.rear_left_door ?? 1.0,
+        doorRearRight: apiData.status?.door_status?.rear_right_door ?? 1.0,
+        engineHood: apiData.status?.door_status?.engine_hood ?? 1.0,
+        tailgate: apiData.status?.door_status?.tailgate ?? 1.0,
+        chargePort: apiData.status?.door_status?.charge_port ?? 1.0,
+
+        // Door lock
+        isLocked: apiData.status?.door_status?.door_lock === 1,
+      }));
+
+      // Update last update time
+      setLastUpdate(new Date().toLocaleString());
+    }
+  }, []);
+
   // Fetch data from NIO API (through Vite proxy to avoid CORS)
   // Parameters exactly matching the curl request
   const updateFromAPI = async () => {
@@ -195,7 +295,7 @@ const App: React.FC = () => {
     };
 
     try {
-      const response = await fetch(url, { headers, method: 'GET', mode: 'cors' });
+      const response = await fetch(url, { headers, method: 'GET' });
       const data = await response.json();
 
       if (data.result_code === 'success' && data.data) {
@@ -305,6 +405,8 @@ const App: React.FC = () => {
         images.push({
           name,
           dataUrl: canvas.toDataURL('image/png'),
+          width: canvas.width,
+          height: canvas.height,
         });
       }
     }
@@ -323,6 +425,96 @@ const App: React.FC = () => {
     link.click();
   };
 
+  // Push all generated images to dot-mindreset device
+  const pushAllImagesToDevice = async () => {
+    if (!apiKey) {
+      alert('请先输入 API Key');
+      return;
+    }
+
+    setPushing(true);
+    setPushResult('');
+    let successCount = 0;
+    let failCount = 0;
+
+    try {
+      // Auto-generate images if not generated yet
+      if (generatedImages.length === 0) {
+        setPushResult('正在生成图片...');
+        await generateImages();
+      }
+
+      // First get the list of all tasks from device
+      const listResponse = await fetch(`https://dot.mindreset.tech/api/authV2/open/device/${deviceId}/loop/list`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!listResponse.ok) {
+        const errText = await listResponse.text();
+        alert(`获取任务列表失败: ${errText}`);
+        setPushing(false);
+        return;
+      }
+
+      const tasks = await listResponse.json();
+      const imageTasks = tasks.filter((task: any) => task.type === 'IMAGE_API');
+
+      if (imageTasks.length !== generatedImages.length) {
+        alert(`设备上有 ${imageTasks.length} 个 IMAGE_API 任务，但生成了 ${generatedImages.length} 张图片，请检查设备配置！`);
+      }
+
+      // Push each image to the corresponding image task's key
+      for (let i = 0; i < generatedImages.length && i < imageTasks.length; i++) {
+        const image = generatedImages[i];
+        const task = imageTasks[i];
+        // dataUrl is "data:image/png;base64,...", extract the base64 part
+        const base64 = image.dataUrl.split(',')[1];
+        const taskKey = task.key; // Use the actual task key from the API
+
+        try {
+          const response = await fetch(`https://dot.mindreset.tech/api/authV2/open/device/${deviceId}/image`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${apiKey}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              image: base64,
+              taskKey: taskKey,
+              refreshNow: true,
+              border: border,
+              ditherType: ditherType,
+            }),
+          });
+
+          if (response.ok) {
+            successCount++;
+          } else {
+            failCount++;
+            console.error(`Push failed for image ${i} (${taskKey}):`, await response.text());
+          }
+        } catch (error) {
+          failCount++;
+          console.error(`Push error for image ${i} (${taskKey}):`, error);
+        }
+      }
+
+      // Any remaining images if counts don't match
+      failCount += Math.max(0, generatedImages.length - imageTasks.length);
+
+    } catch (error) {
+      console.error('Push failed:', error);
+      alert(`推送失败: ${error}`);
+    }
+
+    setPushResult(`完成: ${successCount} 成功, ${failCount} 失败`);
+    setPushing(false);
+  };
+
   return (
     <div className="min-h-screen bg-[#e4e4e4] p-[16px]">
       <div className="w-[1232px] mx-auto">
@@ -337,21 +529,83 @@ const App: React.FC = () => {
               </p>
             )}
           </div>
-          <div className="flex gap-[12px]">
-            <button
-              onClick={updateFromAPI}
-              disabled={updating}
-              className="px-[16px] py-[10px] bg-blue-600 text-white rounded font-jetbrains hover:bg-blue-700 disabled:bg-gray-500 disabled:cursor-not-allowed"
-            >
-              {updating ? '更新中...' : '从NIO API更新数据'}
-            </button>
-            <button
-              onClick={generateImages}
-              disabled={generating}
-              className="px-[16px] py-[10px] bg-black text-white rounded font-jetbrains hover:bg-gray-800 disabled:bg-gray-500 disabled:cursor-not-allowed"
-            >
-              {generating ? '生成中...' : '生成所有组件图片'}
-            </button>
+          <div className="flex flex-col items-end gap-[8px]">
+            <div className="flex gap-[12px]">
+              <button
+                onClick={updateFromAPI}
+                disabled={updating}
+                className="px-[16px] py-[10px] bg-blue-600 text-white rounded font-jetbrains hover:bg-blue-700 disabled:bg-gray-500 disabled:cursor-not-allowed"
+              >
+                {updating ? '更新中...' : '从NIO API更新数据'}
+              </button>
+              <button
+                onClick={generateImages}
+                disabled={generating}
+                className="px-[16px] py-[10px] bg-black text-white rounded font-jetbrains hover:bg-gray-800 disabled:bg-gray-500 disabled:cursor-not-allowed"
+              >
+                {generating ? '生成中...' : '生成所有组件图片'}
+              </button>
+              <button
+                onClick={pushAllImagesToDevice}
+                disabled={pushing}
+                className="px-[16px] py-[10px] bg-green-600 text-white rounded font-jetbrains hover:bg-green-700 disabled:bg-gray-500 disabled:cursor-not-allowed"
+              >
+                {pushing ? '推送中...' : '推送所有图片到设备'}
+              </button>
+            </div>
+            <div className="flex items-center gap-[8px]">
+              <span className="text-[#444444] text-[12px] font-jetbrains">API Key:</span>
+              <input
+                type="password"
+                value={apiKey}
+                onChange={(e) => {
+                  setApiKey(e.target.value);
+                  localStorage.setItem('nio_dashboard_apikey', e.target.value);
+                }}
+                placeholder="输入你的 dot-mindreset API Key"
+                className="px-[8px] py-[4px] border border-gray-300 rounded text-[12px] w-[300px] font-jetbrains"
+              />
+              <span className="text-[#444444] text-[12px] font-jetbrains ml-[8px]">设备:</span>
+              <input
+                type="text"
+                value={deviceId}
+                onChange={(e) => {
+                  setDeviceId(e.target.value);
+                  localStorage.setItem('nio_dashboard_deviceid', e.target.value);
+                }}
+                placeholder="quote/0"
+                className="px-[8px] py-[4px] border border-gray-300 rounded text-[12px] w-[100px] font-jetbrains"
+              />
+              <span className="text-[#444444] text-[12px] font-jetbrains ml-[8px]">边框:</span>
+              <select
+                value={border}
+                onChange={(e) => {
+                  const value = Number(e.target.value);
+                  setBorder(value);
+                  localStorage.setItem('nio_dashboard_border', String(value));
+                }}
+                className="px-[4px] py-[4px] border border-gray-300 rounded text-[12px] font-jetbrains"
+              >
+                <option value={0}>白色</option>
+                <option value={1}>黑色</option>
+              </select>
+              <span className="text-[#444444] text-[12px] font-jetbrains ml-[8px]">抖动:</span>
+              <select
+                value={ditherType}
+                onChange={(e) => {
+                  setDitherType(e.target.value);
+                  localStorage.setItem('nio_dashboard_dither', e.target.value);
+                }}
+                className="px-[4px] py-[4px] border border-gray-300 rounded text-[12px] font-jetbrains"
+              >
+                <option value="DIFFUSION">扩散</option>
+                <option value="ORDERED">有序</option>
+                <option value="NONE">无</option>
+              </select>
+              {pushResult && (
+                <span className="text-[#444444] text-[12px] font-jetbrains">{pushResult}</span>
+              )}
+            </div>
           </div>
         </div>
 
@@ -401,6 +655,7 @@ const App: React.FC = () => {
             <GPSWidget
               longitude={widgetData.gpsLongitude}
               latitude={widgetData.gpsLatitude}
+              address={widgetData.gpsAddress}
             />
           </div>
           <div ref={widgetRefs.specialModes}>

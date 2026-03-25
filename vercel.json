@@ -1,0 +1,30 @@
+{
+  "version": 2,
+  "rewrites": [
+    { "source": "/nio-api/(.*)", "destination": "https://app.nio.com/$1" }
+  ],
+  "headers": [
+    {
+      "source": "/nio-api/(.*)",
+      "headers": [
+        { "key": "Access-Control-Allow-Origin", "value": "*" },
+        { "key": "Access-Control-Allow-Methods", "value": "GET, POST, OPTIONS" },
+        { "key": "Access-Control-Allow-Headers", "value": "*" },
+        { "key": "Cache-Control", "value": "no-cache, no-store, must-revalidate" },
+        { "key": "Pragma", "value": "no-cache" },
+        { "key": "Expires", "value": "0" }
+      ]
+    }
+  ],
+  "routes": [
+    { "src": "/assets/(.*)", "dest": "/assets/$1" },
+    { "src": "/api/(.*)", "dest": "/api/$1" },
+    { "src": "/nio-api/(.*)", "dest": "/nio-api/$1" },
+    { "src": "/(.*)", "dest": "/index.html" }
+  ],
+  "functions": {
+    "api/push.ts": {
+      "maxDuration": 300
+    }
+  }
+}

@@ -8,7 +8,7 @@ const GPSWidget: React.FC<GPSData> = ({
   address = '广东省深圳市宝安区停车场'
 }) => {
   return (
-    <div className="w-[296px] h-[152px] bg-white rounded-none p-[6px_10px_6px_10px] flex flex-col justify-between gap-[8px]">
+    <div className="w-[296px] h-[152px] bg-white rounded-none p-[6px_10px_6px_10px] flex flex-col justify-between gap-[6px]">
       {/* Header */}
       <div className="flex items-center justify-between w-full rounded-[6px] bg-[#F8F8F8] px-[10px] py-[5px]">
         <span className="text-[#000000] text-[16px] font-[600] font-jetbrains">GPS位置</span>
@@ -16,17 +16,22 @@ const GPSWidget: React.FC<GPSData> = ({
       </div>
 
       {/* Coords */}
-      <div className="flex flex-col justify-between gap-[8px] w-full flex-1">
+      <div className="flex flex-col justify-between gap-[6px] w-full flex-1">
         {/* Longitude */}
-        <div className="flex items-center justify-between w-full rounded-[6px] bg-[#F5F5F5] px-[12px] py-[8px]">
+        <div className="flex items-center justify-between w-full rounded-[6px] bg-[#F5F5F5] px-[12px] py-[6px]">
           <span className="text-[#333333] text-[14px] font-[500] font-jetbrains">经度</span>
           <span className="text-[#000000] text-[17px] font-[700] font-jetbrains">{longitude.toFixed(4)}</span>
         </div>
 
         {/* Latitude */}
-        <div className="flex items-center justify-between w-full rounded-[6px] bg-[#F5F5F5] px-[12px] py-[8px]">
+        <div className="flex items-center justify-between w-full rounded-[6px] bg-[#F5F5F5] px-[12px] py-[6px]">
           <span className="text-[#333333] text-[14px] font-[500] font-jetbrains">纬度</span>
           <span className="text-[#000000] text-[17px] font-[700] font-jetbrains">{latitude.toFixed(4)}</span>
+        </div>
+
+        {/* Address */}
+        <div className="w-full rounded-[6px] bg-[#F5F5F5] px-[12px] py-[6px]">
+          <span className="text-[#333333] text-[12px] font-[500] font-jetbrains block truncate">{address}</span>
         </div>
       </div>
     </div>

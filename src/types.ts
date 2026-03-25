@@ -80,6 +80,13 @@ export interface NIOAPIResponse {
   data: NIOWidgetData;
 }
 
+export interface GeneratedImage {
+  name: string;
+  dataUrl: string;
+  width: number;
+  height: number;
+}
+
 export interface NIOWidgetData {
   checked_in: {
     checked: boolean;

@@ -18,7 +18,6 @@ const ChargingWidget: React.FC<ChargingWidgetProps> = ({
   chrgReq = 0,
 }) => {
   const powerPercent = Math.min((chargingPower / MAX_POWER) * 100, 100);
-  const isCharging = chargingPower > 0;
 
   return (
     <div className="w-[296px] h-[152px] bg-white rounded-none p-[6px_10px_6px_10px] flex flex-col justify-between gap-[4px]">

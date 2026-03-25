@@ -7,7 +7,6 @@ interface SwipeableCardStackProps {
 }
 
 const SWIPE_THRESHOLD = 100;
-const OVERFLOW_OFFSET = 8;
 
 const SwipeableCardStack: React.FC<SwipeableCardStackProps> = ({ widgets }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
