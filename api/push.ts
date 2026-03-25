@@ -106,7 +106,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       args: [...chromiumAny.args, '--no-sandbox', '--disable-setuid-sandbox'],
       defaultViewport: chromiumAny.defaultViewport,
       executablePath: await chromiumAny.executablePath(),
-      headless: chromiumAny.headless,
+      headless: 'new', // Use new headless mode as recommended by Puppeteer
     });
 
     const page = await browser.newPage();
@@ -132,9 +132,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     await page.setContent(html, { waitUntil: 'domcontentloaded', timeout: 60000 });
     console.log('✓ Loaded local HTML with injected NIO data');
 
-    // Wait longer for JS to load and React to render
+    // Wait longer for JS to load and React to render (extra slow on Vercel)
     console.log('⟪ Waiting extra time for React to render...');
-    await page.waitForTimeout(15000);
+    await page.waitForTimeout(25000);
 
     // Debug: dump page HTML to console so we can see what's actually rendered
     console.log('⟪ 1. Getting page content...');
