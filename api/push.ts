@@ -4,22 +4,22 @@ import chromium from '@sparticuz/chromium';
 import fs from 'fs';
 import path from 'path';
 
-// 11 widgets distributed across 3 rows (using IDs for precise selection)
+// 11 widgets distributed across 3 rows (use IDs on each widget for reliable selection)
 const WIDGET_SELECTORS = [
   // Row 1 (3 widgets)
-  '#widget-row-1 > div:nth-child(1) > div', // battery
-  '#widget-row-1 > div:nth-child(2) > div', // doorsWindows
-  '#widget-row-1 > div:nth-child(3) > div', // vehicleDoors
+  '#widget-battery', // battery
+  '#widget-doorsWindows', // doorsWindows
+  '#widget-vehicleDoors', // vehicleDoors
   // Row 2 (4 widgets)
-  '#widget-row-2 > div:nth-child(1) > div', // fotaVersion
-  '#widget-row-2 > div:nth-child(2) > div', // gps
-  '#widget-row-2 > div:nth-child(3) > div', // specialModes
-  '#widget-row-2 > div:nth-child(4) > div', // charging
+  '#widget-fotaVersion', // fotaVersion
+  '#widget-gps', // gps
+  '#widget-specialModes', // specialModes
+  '#widget-charging', // charging
   // Row 3 (4 widgets)
-  '#widget-row-3 > div:nth-child(1) > div', // vehicleInfo
-  '#widget-row-3 > div:nth-child(2) > div', // seatHeating
-  '#widget-row-3 > div:nth-child(3) > div', // connection
-  '#widget-row-3 > div:nth-child(4) > div', // temperature
+  '#widget-vehicleInfo', // vehicleInfo
+  '#widget-seatHeating', // seatHeating
+  '#widget-connection', // connection
+  '#widget-temperature', // temperature
 ];
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -147,8 +147,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     console.log('✓ Loaded local HTML with injected NIO data');
 
     // Wait longer for JS to load and React to render (extra slow on Vercel)
-    console.log('⟪ Waiting extra time for React to render...');
-    await page.waitForTimeout(25000);
+    // Vercel Functions have CPU/network constraints - need more time than local
+    console.log('⟪ Waiting for React to render (longer timeout for Vercel)...');
+    await page.waitForTimeout(40000);
 
     // Debug: dump page HTML to console so we can see what's actually rendered
     console.log('⟪ 1. Getting page content...');
@@ -158,41 +159,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     console.log(`✓ Contains "flex" class: ${pageHtml.includes('flex')}`);
     console.log(`✓ Contains "grid" class: ${pageHtml.includes('grid')}`);
     console.log('✓ Injected script found:', pageHtml.includes('window.__NIO_RAW_DATA__'));
+    // Check if all widget IDs exist
+    const hasFirstWidget = pageHtml.includes('widget-battery');
+    console.log('✓ widget-battery id found:', hasFirstWidget);
     console.log('=== PAGE HTML DEBUG END ===');
 
-    // Debug: count how many .flex elements we have
-    console.log('⟪ 2. Counting .flex elements...');
-    const flexCount = await page.evaluate(() => document.querySelectorAll('.flex').length);
-    console.log(`✓ Found ${flexCount} .flex elements in the page`);
-
-    // Debug: list each .flex element info
-    const flexInfo = await page.evaluate(() => {
-      const flexes = Array.from(document.querySelectorAll('.flex'));
-      return flexes.map((el, index) => {
-        const childCount = el.children.length;
-        const className = el.className;
-        return { index: index + 1, childCount, className };
-      });
-    });
-    console.log('=== FLEX ELEMENTS DEBUG ===');
-    flexInfo.forEach(info => {
-      console.log(`✓ .flex:nth-child(${info.index}): ${info.childCount} children, classes="${info.className}"`);
-    });
-    console.log('=== FLEX ELEMENTS DEBUG END ===');
-
-    // Debug: check if our target selector exists
-    console.log(`⟪ 3. Checking target selector: ${WIDGET_SELECTORS[0]}`);
+    // Wait for the first widget to render with increased timeout
+    // Using direct ID selector is much more reliable than nth-child hierarchy
+    console.log(`⟪ Waiting for first widget selector: ${WIDGET_SELECTORS[0]}`);
     const targetExists = await page.$(WIDGET_SELECTORS[0]);
     if (targetExists) {
       console.log('✓ Target selector FOUND!');
     } else {
-      console.log('✗ Target selector NOT found!');
+      console.log('⚠ Target selector not found immediately, waiting...');
     }
-
-    // Wait for the first widget to render (we have 11 widgets total)
-    console.log('⟪ 4. Waiting for selector...');
     await page.waitForSelector(WIDGET_SELECTORS[0], { timeout: 60000 });
-    await page.waitForTimeout(8000);
+    // Extra wait for all widgets to complete rendering
+    await page.waitForTimeout(10000);
     console.log('✓ Page rendered, starting screenshots');
 
     // Step 4: Screenshot each widget and push to device

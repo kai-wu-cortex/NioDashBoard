@@ -611,7 +611,7 @@ const App: React.FC = () => {
 
         {/* Row 1 - 3 widgets */}
         <div id="widget-row-1" className="flex gap-[16px] mb-[16px]">
-          <div ref={widgetRefs.battery}>
+          <div id="widget-battery" ref={widgetRefs.battery}>
             <BatteryWidget
               isCharging={widgetData.isCharging}
               soc={widgetData.batterySoc}
@@ -619,7 +619,7 @@ const App: React.FC = () => {
               totalMileage={widgetData.totalMileage}
             />
           </div>
-          <div ref={widgetRefs.doorsWindows}>
+          <div id="widget-doorsWindows" ref={widgetRefs.doorsWindows}>
             <DoorsWindowsWidget
               driverDoor={widgetData.frontLeftWindow > 0}
               passengerDoor={widgetData.frontRightWindow > 0}
@@ -629,7 +629,7 @@ const App: React.FC = () => {
               isLocked={widgetData.isLocked}
             />
           </div>
-          <div ref={widgetRefs.vehicleDoors}>
+          <div id="widget-vehicleDoors" ref={widgetRefs.vehicleDoors}>
             <VehicleDoorsWidget
               frontLeft={widgetData.doorFrontLeft}
               frontRight={widgetData.doorFrontRight}
@@ -644,21 +644,21 @@ const App: React.FC = () => {
 
         {/* Row 2 - 4 widgets */}
         <div id="widget-row-2" className="flex gap-[16px] mb-[16px]">
-          <div ref={widgetRefs.fotaVersion}>
+          <div id="widget-fotaVersion" ref={widgetRefs.fotaVersion}>
             <FOTAVersionWidget
               currentVersion={widgetData.fotaVersion}
               partNumber={widgetData.fotaPartNumber}
               isUpToDate={widgetData.fotaIsLatest}
             />
           </div>
-          <div ref={widgetRefs.gps}>
+          <div id="widget-gps" ref={widgetRefs.gps}>
             <GPSWidget
               longitude={widgetData.gpsLongitude}
               latitude={widgetData.gpsLatitude}
               address={widgetData.gpsAddress}
             />
           </div>
-          <div ref={widgetRefs.specialModes}>
+          <div id="widget-specialModes" ref={widgetRefs.specialModes}>
             <SpecialModesWidget
               pet={widgetData.petMode}
               power={widgetData.powerHoldMode}
@@ -667,7 +667,7 @@ const App: React.FC = () => {
               remote={widgetData.remoteVideo}
             />
           </div>
-          <div ref={widgetRefs.charging}>
+          <div id="widget-charging" ref={widgetRefs.charging}>
             <ChargingWidget
               chargingPower={widgetData.chargingPower}
               chargingCurrent={widgetData.chargingCurrent}
@@ -679,14 +679,14 @@ const App: React.FC = () => {
 
         {/* Row 3 - 4 widgets */}
         <div id="widget-row-3" className="flex gap-[16px] mb-[32px]">
-          <div ref={widgetRefs.vehicleInfo}>
+          <div id="widget-vehicleInfo" ref={widgetRefs.vehicleInfo}>
             <VehicleInfoWidget
               totalMileage={widgetData.totalMileage}
               vehicleId="c367...08b43"
               status="Ready"
             />
           </div>
-          <div ref={widgetRefs.seatHeating}>
+          <div id="widget-seatHeating" ref={widgetRefs.seatHeating}>
             <SeatHeatingWidget
               steeringWheel={widgetData.steeringWheelHeat}
               frontLeft={widgetData.frontLeftHeat}
@@ -699,14 +699,14 @@ const App: React.FC = () => {
               rearRightVent={widgetData.rearRightVent}
             />
           </div>
-          <div ref={widgetRefs.connection}>
+          <div id="widget-connection" ref={widgetRefs.connection}>
             <ConnectionWidget
               cdcConnected={widgetData.cdcConnected}
               adcConnected={widgetData.adcConnected}
               accountId={widgetData.accountId}
             />
           </div>
-          <div ref={widgetRefs.temperature}>
+          <div id="widget-temperature" ref={widgetRefs.temperature}>
             <TemperatureWidget
               inside={widgetData.insideTemp}
               outside={widgetData.outsideTemp}
