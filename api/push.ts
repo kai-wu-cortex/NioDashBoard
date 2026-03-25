@@ -198,31 +198,39 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
     console.log('=== PAGE HTML DEBUG END ===');
 
-    // Wait for the first widget to render with increased timeout
+    // Wait for the first widget to render with polling
     // Using direct ID selector is much more reliable than nth-child hierarchy
-    // visible: false → resolve as soon as the selector matches, even if element is not visible
-    // We just need the element to exist in DOM for screenshot, visibility doesn't matter
-    console.log(`⟪ Waiting for first widget selector: ${WIDGET_SELECTORS[0]}`);
+    // We already know from page.content() that element should exist
+    console.log(`⟪ Polling for first widget selector: ${WIDGET_SELECTORS[0]}`);
 
-    // Debug: check directly via document.getElementById
-    const elementExists = await page.evaluate((selector) => {
-      const id = selector.slice(1); // remove #
-      return document.getElementById(id) !== null;
-    }, WIDGET_SELECTORS[0]);
+    // Poll until element exists, max 60 seconds
+    let elementExists = false;
+    for (let i = 0; i < 60; i++) {
+      elementExists = await page.evaluate((selector) => {
+        const id = selector.slice(1); // remove #
+        return document.getElementById(id) !== null;
+      }, WIDGET_SELECTORS[0]);
+      if (elementExists) {
+        break;
+      }
+      await page.waitForTimeout(1000);
+    }
 
     console.log(`✓ Debug: document.getElementById found "${WIDGET_SELECTORS[0]}": ${elementExists}`);
+
+    if (!elementExists) {
+      throw new Error(`Element ${WIDGET_SELECTORS[0]} not found after 60s polling`);
+    }
 
     const targetExists = await page.$(WIDGET_SELECTORS[0]);
     if (targetExists) {
       console.log('✓ Target selector FOUND by page.$!');
     } else {
-      console.log('⚠ Target selector not found immediately by page.$, waiting...');
+      console.log('⚠ Target selector not found immediately by page.$, but document.getElementById says it exists - continuing');
     }
 
-    await page.waitForSelector(WIDGET_SELECTORS[0], { timeout: 60000, visible: false });
-
-    // Extra wait for all widgets to complete rendering
-    await page.waitForTimeout(10000);
+    // Extra short wait for all widgets to complete rendering
+    await page.waitForTimeout(5000);
     console.log('✓ Page rendered, starting screenshots');
 
     // Step 4: Screenshot each widget and push to device
