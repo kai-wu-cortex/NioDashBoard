@@ -172,6 +172,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // Wait for the first widget to render with increased timeout
     // Using direct ID selector is much more reliable than nth-child hierarchy
+    // visible: false → resolve as soon as the selector matches, even if element is not visible
+    // We just need the element to exist in DOM for screenshot, visibility doesn't matter
     console.log(`⟪ Waiting for first widget selector: ${WIDGET_SELECTORS[0]}`);
     const targetExists = await page.$(WIDGET_SELECTORS[0]);
     if (targetExists) {
@@ -179,7 +181,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     } else {
       console.log('⚠ Target selector not found immediately, waiting...');
     }
-    await page.waitForSelector(WIDGET_SELECTORS[0], { timeout: 60000 });
+    await page.waitForSelector(WIDGET_SELECTORS[0], { timeout: 60000, visible: false });
     // Extra wait for all widgets to complete rendering
     await page.waitForTimeout(10000);
     console.log('✓ Page rendered, starting screenshots');
