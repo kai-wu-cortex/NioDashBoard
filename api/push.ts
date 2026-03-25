@@ -116,6 +116,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const indexPath = path.join(process.cwd(), 'dist', 'index.html');
     let html = fs.readFileSync(indexPath, 'utf8');
 
+    // Inject NIO data FIRST, before JS loads, so that React sees it immediately
+    // Inject data before closing </head>, before JS script
+    const injectionScript = `<script>window.__NIO_RAW_DATA__ = ${JSON.stringify(nioData).replace(/</g, '\\u003c')};</script>`;
+    html = html.replace('</head>', `${injectionScript}</head>`);
+
     // INLINE JS and CSS directly into HTML to avoid network requests
     // This guarantees React loads immediately without depending on network
     // Extract asset filenames from HTML
@@ -135,12 +140,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       html = html.replace(/<link[^>]+href="\/assets\/[^"]+"[^>]*>/, `<style>${cssContent}</style>`);
       console.log(`✓ Inlined CSS (${(cssContent.length / 1024).toFixed(2)} KB)`);
     }
-
-    // Inject NIO data directly into HTML BEFORE loading page
-    // This ensures React sees the data when it initializes
-    const injectionScript = `<script>window.__NIO_RAW_DATA__ = ${JSON.stringify(nioData).replace(/</g, '\\u003c')};</script>`;
-    // Add injection script before closing </body>
-    html = html.replace('</body>', `${injectionScript}</body>`);
 
     // Set HTML content directly - more reliable than data URI
     // Use domcontentloaded instead of networkidle0 to avoid waiting for slow resources
