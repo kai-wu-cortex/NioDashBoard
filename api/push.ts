@@ -128,7 +128,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     html = html.replace('</body>', `${injectionScript}</body>`);
 
     // Set HTML content directly - more reliable than data URI
-    await page.setContent(html, { waitUntil: 'networkidle0', timeout: 60000 });
+    // Use domcontentloaded instead of networkidle0 to avoid waiting for slow resources
+    await page.setContent(html, { waitUntil: 'domcontentloaded', timeout: 60000 });
     console.log('✓ Loaded local HTML with injected NIO data');
 
     // Wait longer for JS to load and React to render
