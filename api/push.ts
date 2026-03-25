@@ -123,23 +123,51 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // INLINE JS and CSS directly into HTML to avoid network requests
     // This guarantees React loads immediately without depending on network
-    // Extract asset filenames from HTML - use more robust matching
-    const jsMatch = /src\s*=\s*"\/assets\/([^"]+)"/.exec(html);
-    const cssMatch = /href\s*=\s*"\/assets\/([^"]+)"/.exec(html);
+    // Extract asset filenames from HTML - find all matches and pick the correct one
+    const jsRegex = /src\s*=\s*"\/assets\/([^"]+)"/g;
+    const cssRegex = /href\s*=\s*"\/assets\/([^"]+)"/g;
+    let jsMatch: RegExpExecArray | null = null;
+    let cssMatch: RegExpExecArray | null = null;
+    let lastJsMatch: RegExpExecArray | null = null;
+    let lastCssMatch: RegExpExecArray | null = null;
 
-    if (jsMatch) {
-      const jsPath = path.join(process.cwd(), 'dist', 'assets', jsMatch[1]);
+    // Find all matches and take the last one (vite outputs only one js and one css)
+    while ((jsMatch = jsRegex.exec(html)) !== null) {
+      if (jsMatch[1].endsWith('.js')) {
+        lastJsMatch = jsMatch;
+      }
+    }
+    while ((cssMatch = cssRegex.exec(html)) !== null) {
+      if (cssMatch[1].endsWith('.css')) {
+        lastCssMatch = cssMatch;
+      }
+    }
+
+    console.log(`→ JS match found: ${!!lastJsMatch}, CSS match found: ${!!lastCssMatch}`);
+    if (lastJsMatch) {
+      console.log(`→ JS filename: ${lastJsMatch[1]}`);
+    }
+    if (lastCssMatch) {
+      console.log(`→ CSS filename: ${lastCssMatch[1]}`);
+    }
+
+    if (lastJsMatch) {
+      const jsPath = path.join(process.cwd(), 'dist', 'assets', lastJsMatch[1]);
       const jsContent = fs.readFileSync(jsPath, 'utf8');
       // Use more robust regex to match the full script tag
       html = html.replace(/<script[^>]+src\s*=\s*"\/assets\/[^"]+"[^>]*><\/script>/, `<script type="module">${jsContent}</script>`);
       console.log(`✓ Inlined JS (${(jsContent.length / 1024 / 1024).toFixed(2)} MB)`);
+    } else {
+      console.error('✗ FAILED to find JS asset in HTML! Check dist/assets/ directory');
     }
 
-    if (cssMatch) {
-      const cssPath = path.join(process.cwd(), 'dist', 'assets', cssMatch[1]);
+    if (lastCssMatch) {
+      const cssPath = path.join(process.cwd(), 'dist', 'assets', lastCssMatch[1]);
       const cssContent = fs.readFileSync(cssPath, 'utf8');
       html = html.replace(/<link[^>]+href\s*=\s*"\/assets\/[^"]+"[^>]*>/, `<style>${cssContent}</style>`);
       console.log(`✓ Inlined CSS (${(cssContent.length / 1024).toFixed(2)} KB)`);
+    } else {
+      console.error('✗ FAILED to find CSS asset in HTML! Check dist/assets/ directory');
     }
 
     // Set HTML content directly - more reliable than data URI
@@ -175,13 +203,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // visible: false → resolve as soon as the selector matches, even if element is not visible
     // We just need the element to exist in DOM for screenshot, visibility doesn't matter
     console.log(`⟪ Waiting for first widget selector: ${WIDGET_SELECTORS[0]}`);
+
+    // Debug: check directly via document.getElementById
+    const elementExists = await page.evaluate((selector) => {
+      const id = selector.slice(1); // remove #
+      return document.getElementById(id) !== null;
+    }, WIDGET_SELECTORS[0]);
+
+    console.log(`✓ Debug: document.getElementById found "${WIDGET_SELECTORS[0]}": ${elementExists}`);
+
     const targetExists = await page.$(WIDGET_SELECTORS[0]);
     if (targetExists) {
-      console.log('✓ Target selector FOUND!');
+      console.log('✓ Target selector FOUND by page.$!');
     } else {
-      console.log('⚠ Target selector not found immediately, waiting...');
+      console.log('⚠ Target selector not found immediately by page.$, waiting...');
     }
+
     await page.waitForSelector(WIDGET_SELECTORS[0], { timeout: 60000, visible: false });
+
     // Extra wait for all widgets to complete rendering
     await page.waitForTimeout(10000);
     console.log('✓ Page rendered, starting screenshots');
