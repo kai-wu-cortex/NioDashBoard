@@ -112,73 +112,45 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const page = await browser.newPage();
     await page.setViewport({ width: 1280, height: 800, deviceScaleFactor: 2 });
 
-    // Read the built index.html from local dist folder (no network request needed)
+    // Read the built files
     const indexPath = path.join(process.cwd(), 'dist', 'index.html');
     let html = fs.readFileSync(indexPath, 'utf8');
 
-    // Inject NIO data FIRST, before JS loads, so that React sees it immediately
-    // Inject data before closing </head>, before JS script
+    // Read JS and CSS files
+    const jsPath = path.join(process.cwd(), 'dist', 'assets', 'index-CZqlCIvn.js');
+    const cssPath = path.join(process.cwd(), 'dist', 'assets', 'index-CugxLFBR.css');
+    const jsContent = fs.readFileSync(jsPath, 'utf8');
+    const cssContent = fs.readFileSync(cssPath, 'utf8');
+
+    // Replace asset references with inline code (use regular script, not module)
+    html = html.replace(/<script[^>]*src="\/assets\/[^"]*"[^>]*><\/script>/, `<script>${jsContent}</script>`);
+    html = html.replace(/<link[^>]*href="\/assets\/[^"]*"[^>]*>/, `<style>${cssContent}</style>`);
+
+    // Inject NIO data before </head>
     const injectionScript = `<script>window.__NIO_RAW_DATA__ = ${JSON.stringify(nioData).replace(/</g, '\\u003c')};</script>`;
     html = html.replace('</head>', `${injectionScript}</head>`);
 
-    // INLINE JS and CSS directly into HTML to avoid network requests
-    // This guarantees React loads immediately without depending on network
-    // Extract asset filenames from HTML - find all matches and pick the correct one
-    const jsRegex = /src\s*=\s*"\/assets\/([^"]+)"/g;
-    const cssRegex = /href\s*=\s*"\/assets\/([^"]+)"/g;
-    let jsMatch: RegExpExecArray | null = null;
-    let cssMatch: RegExpExecArray | null = null;
-    let lastJsMatch: RegExpExecArray | null = null;
-    let lastCssMatch: RegExpExecArray | null = null;
-
-    // Find all matches and take the last one (vite outputs only one js and one css)
-    while ((jsMatch = jsRegex.exec(html)) !== null) {
-      if (jsMatch[1].endsWith('.js')) {
-        lastJsMatch = jsMatch;
-      }
-    }
-    while ((cssMatch = cssRegex.exec(html)) !== null) {
-      if (cssMatch[1].endsWith('.css')) {
-        lastCssMatch = cssMatch;
-      }
-    }
-
-    console.log(`→ JS match found: ${!!lastJsMatch}, CSS match found: ${!!lastCssMatch}`);
-    if (lastJsMatch) {
-      console.log(`→ JS filename: ${lastJsMatch[1]}`);
-    }
-    if (lastCssMatch) {
-      console.log(`→ CSS filename: ${lastCssMatch[1]}`);
-    }
-
-    if (lastJsMatch) {
-      const jsPath = path.join(process.cwd(), 'dist', 'assets', lastJsMatch[1]);
-      const jsContent = fs.readFileSync(jsPath, 'utf8');
-      // Use more robust regex to match the full script tag
-      html = html.replace(/<script[^>]+src\s*=\s*"\/assets\/[^"]+"[^>]*><\/script>/, `<script type="module">${jsContent}</script>`);
-      console.log(`✓ Inlined JS (${(jsContent.length / 1024 / 1024).toFixed(2)} MB)`);
-    } else {
-      console.error('✗ FAILED to find JS asset in HTML! Check dist/assets/ directory');
-    }
-
-    if (lastCssMatch) {
-      const cssPath = path.join(process.cwd(), 'dist', 'assets', lastCssMatch[1]);
-      const cssContent = fs.readFileSync(cssPath, 'utf8');
-      html = html.replace(/<link[^>]+href\s*=\s*"\/assets\/[^"]+"[^>]*>/, `<style>${cssContent}</style>`);
-      console.log(`✓ Inlined CSS (${(cssContent.length / 1024).toFixed(2)} KB)`);
-    } else {
-      console.error('✗ FAILED to find CSS asset in HTML! Check dist/assets/ directory');
-    }
-
-    // Set HTML content directly - more reliable than data URI
-    // Use domcontentloaded instead of networkidle0 to avoid waiting for slow resources
-    await page.setContent(html, { waitUntil: 'domcontentloaded', timeout: 60000 });
-    console.log('✓ Loaded local HTML with injected NIO data');
+    // Set content - wait for load event
+    await page.setContent(html, { waitUntil: 'load', timeout: 60000 });
+    console.log('✓ Loaded HTML with inline JS/CSS');
 
     // Wait longer for JS to load and React to render (extra slow on Vercel)
     // Vercel Functions have CPU/network constraints - need more time than local
     console.log('⟪ Waiting for React to render (longer timeout for Vercel)...');
-    await page.waitForTimeout(40000);
+
+    // Check if React initialized by evaluating in page
+    const reactInitialized = await page.evaluate(() => {
+      return typeof window !== 'undefined' && typeof window.React !== 'undefined';
+    });
+    console.log('✓ React initialized:', reactInitialized);
+
+    // Check if __NIO_RAW_DATA__ exists in page
+    const hasInjectedData = await page.evaluate(() => {
+      return typeof (window as any).__NIO_RAW_DATA__ !== 'undefined';
+    });
+    console.log('✓ __NIO_RAW_DATA__ exists:', hasInjectedData);
+
+    await page.waitForTimeout(50000);
 
     // Debug: dump page HTML to console so we can see what's actually rendered
     console.log('⟪ 1. Getting page content...');
@@ -199,38 +171,54 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     console.log('=== PAGE HTML DEBUG END ===');
 
     // Wait for the first widget to render with polling
-    // Using direct ID selector is much more reliable than nth-child hierarchy
-    // We already know from page.content() that element should exist
+    // We already know from page.content() that element should exist in HTML
     console.log(`⟪ Polling for first widget selector: ${WIDGET_SELECTORS[0]}`);
 
-    // Poll until element exists, max 60 seconds
-    let elementExists = false;
+    // Debug: check document ready state
+    const readyState = await page.evaluate(() => document.readyState);
+    console.log('✓ Document ready state:', readyState);
+
+    // Debug: check if document body has any content
+    const bodyHtml = await page.evaluate(() => document.body ? document.body.innerHTML.length : 0);
+    console.log('✓ Body HTML length:', bodyHtml);
+
+    // Debug: check for any elements with id starting with "widget-"
+    const widgetElements = await page.evaluate(() => {
+      const widgets = document.querySelectorAll('[id^="widget-"]');
+      return Array.from(widgets).map(el => el.id);
+    });
+    console.log('✓ Found widget elements:', widgetElements);
+
+    // Poll using page.evaluate (more reliable than waitForSelector on dynamic content)
+    // Poll until element exists AND is not empty (has rendered children)
+    let elementReady = false;
     for (let i = 0; i < 60; i++) {
-      elementExists = await page.evaluate((selector) => {
+      elementReady = await page.evaluate((selector: string) => {
         const id = selector.slice(1); // remove #
-        return document.getElementById(id) !== null;
+        const element = document.getElementById(id);
+        // Check that element exists AND has children (rendered by React)
+        return element !== null && element.children.length > 0;
       }, WIDGET_SELECTORS[0]);
-      if (elementExists) {
+      if (elementReady) {
         break;
       }
       await page.waitForTimeout(1000);
     }
 
-    console.log(`✓ Debug: document.getElementById found "${WIDGET_SELECTORS[0]}": ${elementExists}`);
+    console.log(`✓ Debug: ${WIDGET_SELECTORS[0]} is ready: ${elementReady}`);
 
-    if (!elementExists) {
-      throw new Error(`Element ${WIDGET_SELECTORS[0]} not found after 60s polling`);
+    if (!elementReady) {
+      // Even if not ready, check if it at least exists
+      const elementExists = await page.evaluate((selector: string) => {
+        const id = selector.slice(1);
+        return document.getElementById(id) !== null;
+      }, WIDGET_SELECTORS[0]);
+      console.log(`⚠ Element exists but not ready: ${elementExists}. Continuing anyway...`);
+      // Don't throw error - sometimes it's already rendered but children are empty, let's try screenshot anyway
     }
 
-    const targetExists = await page.$(WIDGET_SELECTORS[0]);
-    if (targetExists) {
-      console.log('✓ Target selector FOUND by page.$!');
-    } else {
-      console.log('⚠ Target selector not found immediately by page.$, but document.getElementById says it exists - continuing');
-    }
-
-    // Extra short wait for all widgets to complete rendering
-    await page.waitForTimeout(5000);
+    // Extra wait for all widgets to complete rendering
+    await page.waitForTimeout(10000);
     console.log('✓ Page rendered, starting screenshots');
 
     // Step 4: Screenshot each widget and push to device
@@ -238,14 +226,29 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     let successCount = 0;
     let failCount = 0;
 
+    // Add extra robustness: retry failed widgets once
     for (let i = 0; i < Math.min(WIDGET_SELECTORS.length, imageTasks.length); i++) {
       const selector = WIDGET_SELECTORS[i];
       const task = imageTasks[i];
 
       try {
-        const element = await page.$(selector);
+        // First attempt
+        let element = await page.$(selector);
+        
+        // If not found, wait and retry once
         if (!element) {
-          throw new Error(`Element not found: ${selector}`);
+          console.log(`⚠ ${selector} not found on first try, waiting 5s and retrying...`);
+          await page.waitForTimeout(5000);
+          element = await page.$(selector);
+        }
+
+        if (!element) {
+          // Final check using evaluate to confirm it exists
+          const exists = await page.evaluate((sel) => {
+            const id = sel.slice(1);
+            return document.getElementById(id) !== null;
+          }, selector);
+          throw new Error(`Element not found: ${selector} (exists in HTML: ${exists})`);
         }
 
         const screenshot = await element.screenshot({
@@ -297,6 +300,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         failCount++;
         results.push({
           index: i,
+          selector: selector,
           success: false,
           error: error.message,
         });
