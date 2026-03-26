@@ -23,10 +23,15 @@ const WIDGET_SELECTORS = [
 ];
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  // 默认值（如果没有提供，使用这些默认值）
+  const DEFAULT_API_KEY = 'dot_app_ttaPeeNhDpRNFblCfCoQnUQbGdzrjghxHVLzFmjQzxCuzItVFCyAAgHkcLofQZsI';
+  const DEFAULT_DEVICE_ID = '9C9E6E39DAF4';
+
   try {
+    // 从查询参数获取，如果未提供则使用默认值
     const {
-      api_key: apiKey,
-      device_id: deviceId,
+      api_key: apiKey = DEFAULT_API_KEY,
+      device_id: deviceId = DEFAULT_DEVICE_ID,
       border = "1",
       dither_type: ditherType = "DIFFUSION",
     } = req.query;
