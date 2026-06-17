@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   DEFAULT_NIO_REQUEST_CONFIG,
   normalizeNioRequestConfig,
@@ -68,6 +68,10 @@ const NioRequestConfigPanel: React.FC<NioRequestConfigPanelProps> = ({
   const [jsonError, setJsonError] = useState('');
 
   const validation = useMemo(() => validateNioRequestConfig(config), [config]);
+
+  useEffect(() => {
+    setJsonText(formatConfigJson(config));
+  }, [config]);
 
   const syncConfig = (next: NioRequestConfig, message: string) => {
     onChange(next);

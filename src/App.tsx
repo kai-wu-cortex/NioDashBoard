@@ -150,7 +150,11 @@ const App: React.FC = () => {
 
   // Fetch data from NIO API (through Vite proxy to avoid CORS)
   // Parameters exactly matching the curl request
-  const updateFromAPI = async (config: NioRequestConfig = nioRequestConfig) => {
+  const updateFromAPI = async (
+    config: NioRequestConfig = nioRequestConfig,
+    options: { save?: boolean } = {}
+  ) => {
+    const shouldSave = options.save ?? true;
     setUpdating(true);
 
     try {
@@ -161,8 +165,10 @@ const App: React.FC = () => {
         return false;
       }
 
-      setNioRequestConfig(config);
-      saveNioRequestConfig(config);
+      if (shouldSave) {
+        setNioRequestConfig(config);
+        saveNioRequestConfig(config);
+      }
       const url = buildNioRequestUrl(config);
       const response = await fetch(url, { headers: config.headers, method: 'GET' });
       const data = await response.json();
@@ -189,7 +195,7 @@ const App: React.FC = () => {
   };
 
   const testNioRequestConfig = async (config: NioRequestConfig) => {
-    return updateFromAPI(config);
+    return updateFromAPI(config, { save: false });
   };
 
   const generateImages = async () => {
