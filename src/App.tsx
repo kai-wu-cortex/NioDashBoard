@@ -13,6 +13,13 @@ import TemperatureWidget from './components/TemperatureWidget';
 import ChargingWidget from './components/ChargingWidget';
 import { GeneratedImage } from './types';
 import { mapNioApiDataToWidgetState, type WidgetDataState } from './utils/mapNioApiData';
+import {
+  buildNioRequestUrl,
+  loadNioRequestConfig,
+  saveNioRequestConfig,
+  validateNioRequestConfig,
+  type NioRequestConfig,
+} from './config/nioRequestConfig';
 
 const App: React.FC = () => {
   // Initial default data
@@ -80,6 +87,7 @@ const App: React.FC = () => {
   const [generating, setGenerating] = useState(false);
   const [updating, setUpdating] = useState(false);
   const [lastUpdate, setLastUpdate] = useState<string>('');
+  const [nioRequestConfig, setNioRequestConfig] = useState<NioRequestConfig>(() => loadNioRequestConfig());
   const [apiKey, setApiKey] = useState<string>(() => {
     return localStorage.getItem('nio_dashboard_apikey') || '';
   });
@@ -141,21 +149,21 @@ const App: React.FC = () => {
 
   // Fetch data from NIO API (through Vite proxy to avoid CORS)
   // Parameters exactly matching the curl request
-  const updateFromAPI = async () => {
+  const updateFromAPI = async (config: NioRequestConfig = nioRequestConfig) => {
     setUpdating(true);
-    const url = "/nio-api/app/api/icar/v2/widget/info?lang=zh-CN&app_id=10002&timestamp=1774198476&app_ver=6.3.0&device_id=14e3f556d3984993a59ad96e8af3ba2d&widget_functions=rvs_set_doorlock%2Crvs_set_air_conditioner%2Crvs_set_tailgate%2Crvs_exe_findme&widget_size=medium&region=cn&vehicle_id=c36736658c7b4b7e8d5a484b8f908b43&sign=7165a503f129317c909169732c6260de";
-
-    const headers = {
-      "Host": "app.nio.com",
-      "Connection": "keep-alive",
-      "Accept": "application/json,text/json,text/plain",
-      "User-Agent": "VehicleWidgetExtension/6.3.0 (com.do1.WeiLaiApp.NIOVehicleWidget; build:2586; iOS 26.3.1) Alamofire/5.9.1",
-      "Authorization": "Bearer 2.0IkLw1IayXSA5CD32/1MdpTe9sF9zhR5BPmTEA3a2JX0=",
-      "Accept-Language": "zh-CN,zh-Hans;q=0.9",
-    };
 
     try {
-      const response = await fetch(url, { headers, method: 'GET' });
+      const validation = validateNioRequestConfig(config);
+      if (!validation.valid) {
+        console.error('Invalid NIO request config:', validation.errors);
+        alert('配置无效：' + validation.errors.join(', '));
+        return false;
+      }
+
+      setNioRequestConfig(config);
+      saveNioRequestConfig(config);
+      const url = buildNioRequestUrl(config);
+      const response = await fetch(url, { headers: config.headers, method: 'GET' });
       const data = await response.json();
 
       if (data.result_code === 'success' && data.data) {
@@ -165,13 +173,18 @@ const App: React.FC = () => {
         setWidgetData(prev => mapNioApiDataToWidgetState(prev, apiData));
 
         setLastUpdate(new Date().toLocaleString());
+        return true;
+      } else {
+        console.error('API returned error:', data);
+        return false;
       }
     } catch (error) {
       console.error('Failed to fetch from NIO API:', error);
       alert('获取数据失败，可能是跨域问题。请在浏览器控制台查看错误信息。');
+      return false;
+    } finally {
+      setUpdating(false);
     }
-
-    setUpdating(false);
   };
 
   const generateImages = async () => {
@@ -324,7 +337,7 @@ const App: React.FC = () => {
           <div className="flex flex-col items-end gap-[8px]">
             <div className="flex gap-[12px]">
               <button
-                onClick={updateFromAPI}
+                onClick={() => updateFromAPI()}
                 disabled={updating}
                 className="px-[16px] py-[10px] bg-blue-600 text-white rounded font-jetbrains hover:bg-blue-700 disabled:bg-gray-500 disabled:cursor-not-allowed"
               >
