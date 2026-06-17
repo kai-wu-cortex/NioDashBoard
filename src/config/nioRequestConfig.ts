@@ -10,25 +10,34 @@ export interface NioConfigValidationResult {
 
 export const NIO_REQUEST_CONFIG_STORAGE_KEY = 'nio_dashboard_request_config';
 
-export const DEFAULT_NIO_REQUEST_CONFIG: NioRequestConfig = {
-  query: {
+export const DEFAULT_NIO_REQUEST_CONFIG: NioRequestConfig = Object.freeze({
+  query: Object.freeze({
     lang: 'zh-CN',
-    app_id: 'nioapp',
-    timestamp: Date.now().toString(),
-    app_ver: '2.0.0',
-    device_id: 'default-device-id',
-    widget_functions: 'get_widget_info',
+    app_id: '10002',
+    timestamp: '1774198476',
+    app_ver: '6.3.0',
+    device_id: '14e3f556d3984993a59ad96e8af3ba2d',
+    widget_functions: 'rvs_set_doorlock,rvs_set_air_conditioner,rvs_set_tailgate,rvs_exe_findme',
     widget_size: 'medium',
     region: 'cn',
-    vehicle_id: '',
-    sign: ''
-  },
-  headers: {
-    Accept: 'application/json, text/plain, */*',
-    'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
-    Authorization: 'Bearer default-token',
-    'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8'
-  }
+    vehicle_id: 'c36736658c7b4b7e8d5a484b8f908b43',
+    sign: '7165a503f129317c909169732c6260de'
+  }),
+  headers: Object.freeze({
+    Accept: 'application/json,text/json,text/plain',
+    'User-Agent': 'VehicleWidgetExtension/6.3.0 (com.do1.WeiLaiApp.NIOVehicleWidget; build:2586; iOS 26.3.1) Alamofire/5.9.1',
+    Authorization: 'Bearer 2.0IkLw1IayXSA5CD32/1MdpTe9sF9zhR5BPmTEA3a2JX0=',
+    'Accept-Language': 'zh-CN,zh-Hans;q=0.9'
+  })
+});
+
+const cloneDefaultNioRequestConfig = (): NioRequestConfig => ({
+  query: { ...DEFAULT_NIO_REQUEST_CONFIG.query },
+  headers: { ...DEFAULT_NIO_REQUEST_CONFIG.headers }
+});
+
+const canUseLocalStorage = (): boolean => {
+  return typeof window !== 'undefined' && typeof window.localStorage !== 'undefined';
 };
 
 function normalizeValue(value: unknown): string {
@@ -40,7 +49,7 @@ function normalizeValue(value: unknown): string {
 
 export function normalizeNioRequestConfig(value: unknown): NioRequestConfig {
   if (!value || typeof value !== 'object') {
-    return { ...DEFAULT_NIO_REQUEST_CONFIG };
+    return cloneDefaultNioRequestConfig();
   }
 
   const config = value as Partial<NioRequestConfig>;
@@ -71,6 +80,10 @@ export function normalizeNioRequestConfig(value: unknown): NioRequestConfig {
 }
 
 export function loadNioRequestConfig(): NioRequestConfig {
+  if (!canUseLocalStorage()) {
+    return cloneDefaultNioRequestConfig();
+  }
+
   try {
     const stored = window.localStorage.getItem(NIO_REQUEST_CONFIG_STORAGE_KEY);
     if (stored) {
@@ -80,10 +93,14 @@ export function loadNioRequestConfig(): NioRequestConfig {
   } catch (error) {
     console.error('Failed to load NIO request config:', error);
   }
-  return { ...DEFAULT_NIO_REQUEST_CONFIG };
+  return cloneDefaultNioRequestConfig();
 }
 
 export function saveNioRequestConfig(config: NioRequestConfig): void {
+  if (!canUseLocalStorage()) {
+    return;
+  }
+
   try {
     const normalized = normalizeNioRequestConfig(config);
     window.localStorage.setItem(NIO_REQUEST_CONFIG_STORAGE_KEY, JSON.stringify(normalized));
@@ -93,15 +110,18 @@ export function saveNioRequestConfig(config: NioRequestConfig): void {
 }
 
 export function resetNioRequestConfig(): NioRequestConfig {
-  window.localStorage.removeItem(NIO_REQUEST_CONFIG_STORAGE_KEY);
-  return { ...DEFAULT_NIO_REQUEST_CONFIG };
+  if (canUseLocalStorage()) {
+    window.localStorage.removeItem(NIO_REQUEST_CONFIG_STORAGE_KEY);
+  }
+
+  return cloneDefaultNioRequestConfig();
 }
 
 export function buildNioRequestUrl(config: NioRequestConfig): string {
   const params = new URLSearchParams();
 
   Object.entries(config.query).forEach(([key, value]) => {
-    if (value.trim() !== '') {
+    if (key.trim() !== '' && value.trim() !== '') {
       params.append(key, value.trim());
     }
   });

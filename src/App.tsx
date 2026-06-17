@@ -11,77 +11,16 @@ import SeatHeatingWidget from './components/SeatHeatingWidget';
 import ConnectionWidget from './components/ConnectionWidget';
 import TemperatureWidget from './components/TemperatureWidget';
 import ChargingWidget from './components/ChargingWidget';
+import NioRequestConfigPanel from './components/NioRequestConfigPanel';
 import { GeneratedImage } from './types';
-
-interface WidgetDataState {
-  // Battery
-  batterySoc: number;
-  batteryRange: number;
-  totalMileage: number;
-  isCharging: boolean;
-
-  // GPS
-  gpsLongitude: number;
-  gpsLatitude: number;
-  gpsAddress: string;
-
-  // Special Modes
-  petMode: boolean;
-  powerHoldMode: boolean;
-  campingMode: boolean;
-  defenderMode: boolean;
-  remoteVideo: boolean;
-
-  // Temperature
-  insideTemp: number;
-  outsideTemp: number;
-  acOn: boolean;
-
-  // Seat Heating & Ventilation
-  steeringWheelHeat: number;
-  frontLeftHeat: number;
-  frontRightHeat: number;
-  rearLeftHeat: number;
-  rearRightHeat: number;
-  thirdRowLeftHeat: number;
-  thirdRowRightHeat: number;
-  frontLeftVent: number;
-  frontRightVent: number;
-  rearLeftVent: number;
-  rearRightVent: number;
-  // Charging info
-  chargingPower: number;
-  chargingCurrent: number;
-  chargingVoltage: number;
-  chrgReq: number;
-
-  // Connection
-  cdcConnected: boolean;
-  adcConnected: boolean;
-  accountId: string;
-
-  // FOTA
-  fotaVersion: string;
-  fotaPartNumber: string;
-  fotaIsLatest: boolean;
-
-  // Windows
-  frontLeftWindow: number;
-  frontRightWindow: number;
-  rearLeftWindow: number;
-  rearRightWindow: number;
-  frontTrunk: number; // 后备箱
-  // Door status (1.0 = 关门, 0.0 = 开门)
-  doorFrontLeft: number;
-  doorFrontRight: number;
-  doorRearLeft: number;
-  doorRearRight: number;
-  engineHood: number;
-  tailgate: number;
-  chargePort: number;
-  // Door lock
-  isLocked: boolean;
-}
+import { mapNioApiDataToWidgetState, type WidgetDataState } from './utils/mapNioApiData';
+import {
+  buildNioRequestUrl,
+  loadNioRequestConfig,
+  saveNioRequestConfig,
+  validateNioRequestConfig,
+  type NioRequestConfig,
+} from './config/nioRequestConfig';
 
 const App: React.FC = () => {
   // Initial default data
@@ -149,6 +88,7 @@ const App: React.FC = () => {
   const [generating, setGenerating] = useState(false);
   const [updating, setUpdating] = useState(false);
   const [lastUpdate, setLastUpdate] = useState<string>('');
+  const [nioRequestConfig, setNioRequestConfig] = useState<NioRequestConfig>(() => loadNioRequestConfig());
   const [apiKey, setApiKey] = useState<string>(() => {
     return localStorage.getItem('nio_dashboard_apikey') || '';
   });
@@ -201,78 +141,7 @@ const App: React.FC = () => {
       console.log('Using pre-injected NIO data from puppeteer', apiData);
 
       // Map API data to our state
-      setWidgetData(prev => ({
-        ...prev,
-        // Battery
-        batterySoc: apiData.status?.soc_status?.soc ?? prev.batterySoc,
-        batteryRange: apiData.status?.soc_status?.remaining_actual_range ?? prev.batteryRange,
-        totalMileage: apiData.status?.exterior_status?.mileage ?? prev.totalMileage,
-        isCharging: (apiData.status?.soc_status?.charge_state ?? 0) === 1.0,
-
-        // GPS
-        gpsLongitude: apiData.status?.position_status?.longitude ?? prev.gpsLongitude,
-        gpsLatitude: apiData.status?.position_status?.latitude ?? prev.gpsLatitude,
-
-        // Special Modes
-        petMode: (apiData.status?.offcar_mode_status?.pet_mode ?? 0) > 0,
-        powerHoldMode: (apiData.status?.offcar_mode_status?.power_hold_mode ?? 0) > 0,
-        campingMode: (apiData.status?.offcar_mode_status?.camping_mode ?? 0) > 0,
-        defenderMode: (apiData.status?.offcar_mode_status?.defender_mode ?? 0) > 0,
-        remoteVideo: (apiData.status?.offcar_mode_status?.remote_video ?? 0) > 0,
-
-        // Temperature
-        insideTemp: apiData.status?.climate_status?.inside_temp ?? prev.insideTemp,
-        outsideTemp: apiData.status?.climate_status?.outside_temp ?? prev.outsideTemp,
-        acOn: apiData.status?.climate_status?.ac_on ?? prev.acOn,
-
-        // Seat Heating & Ventilation
-        steeringWheelHeat: apiData.status?.climate_status?.steering_wheel_heat_level ?? 0,
-        frontLeftHeat: apiData.status?.climate_status?.front_left_heat_level ?? 0,
-        frontRightHeat: apiData.status?.climate_status?.front_right_heat_level ?? 0,
-        rearLeftHeat: apiData.status?.climate_status?.rear_left_heat_level ?? 0,
-        rearRightHeat: apiData.status?.climate_status?.rear_right_heat_level ?? 0,
-        thirdRowLeftHeat: apiData.status?.climate_status?.third_row_left_heat_level ?? 0,
-        thirdRowRightHeat: apiData.status?.climate_status?.third_row_right_heat_level ?? 0,
-        frontLeftVent: apiData.status?.climate_status?.front_left_vent_level ?? 0,
-        frontRightVent: apiData.status?.climate_status?.front_right_vent_level ?? 0,
-        rearLeftVent: apiData.status?.climate_status?.rear_left_vent_level ?? 0,
-        rearRightVent: apiData.status?.climate_status?.rear_right_vent_level ?? 0,
-
-        // Charging info
-        chargingPower: apiData.status?.soc_status?.charging_power ?? 0,
-        chargingCurrent: apiData.status?.soc_status?.charging_current ?? 0,
-        chargingVoltage: apiData.status?.soc_status?.charging_voltage ?? 0,
-        chrgReq: apiData.status?.soc_status?.chrg_req ?? 0,
-
-        // Connection
-        cdcConnected: apiData.status?.connection_status?.cdc_connected ?? true,
-        adcConnected: apiData.status?.connection_status?.adc_connected ?? true,
-        accountId: apiData.status?.connection_status?.account_id ?? prev.accountId,
-
-        // FOTA
-        fotaVersion: apiData.status?.fota_status?.current_version ?? prev.fotaVersion,
-        fotaPartNumber: apiData.status?.fota_status?.current_part_number ?? prev.fotaPartNumber,
-        fotaIsLatest: !(apiData.status?.fota_status?.available_update ?? false),
-
-        // Windows
-        frontLeftWindow: apiData.status?.door_status?.front_left_window ?? 0,
-        frontRightWindow: apiData.status?.door_status?.front_right_window ?? 0,
-        rearLeftWindow: apiData.status?.door_status?.rear_left_window ?? 0,
-        rearRightWindow: apiData.status?.door_status?.rear_right_window ?? 0,
-        frontTrunk: apiData.status?.door_status?.front_trunk ?? 0,
-
-        // Door status (1.0 = 关门, 0.0 = 开门)
-        doorFrontLeft: apiData.status?.door_status?.front_left_door ?? 1.0,
-        doorFrontRight: apiData.status?.door_status?.front_right_door ?? 1.0,
-        doorRearLeft: apiData.status?.door_status?.rear_left_door ?? 1.0,
-        doorRearRight: apiData.status?.door_status?.rear_right_door ?? 1.0,
-        engineHood: apiData.status?.door_status?.engine_hood ?? 1.0,
-        tailgate: apiData.status?.door_status?.tailgate ?? 1.0,
-        chargePort: apiData.status?.door_status?.charge_port ?? 1.0,
-
-        // Door lock
-        isLocked: apiData.status?.door_status?.door_lock === 1,
-      }));
+      setWidgetData(prev => mapNioApiDataToWidgetState(prev, apiData));
 
       // Update last update time
       setLastUpdate(new Date().toLocaleString());
@@ -281,105 +150,52 @@ const App: React.FC = () => {
 
   // Fetch data from NIO API (through Vite proxy to avoid CORS)
   // Parameters exactly matching the curl request
-  const updateFromAPI = async () => {
+  const updateFromAPI = async (
+    config: NioRequestConfig = nioRequestConfig,
+    options: { save?: boolean } = {}
+  ) => {
+    const shouldSave = options.save ?? true;
     setUpdating(true);
-    const url = "/nio-api/app/api/icar/v2/widget/info?lang=zh-CN&app_id=10002&timestamp=1774198476&app_ver=6.3.0&device_id=14e3f556d3984993a59ad96e8af3ba2d&widget_functions=rvs_set_doorlock%2Crvs_set_air_conditioner%2Crvs_set_tailgate%2Crvs_exe_findme&widget_size=medium&region=cn&vehicle_id=c36736658c7b4b7e8d5a484b8f908b43&sign=7165a503f129317c909169732c6260de";
-
-    const headers = {
-      "Host": "app.nio.com",
-      "Connection": "keep-alive",
-      "Accept": "application/json,text/json,text/plain",
-      "User-Agent": "VehicleWidgetExtension/6.3.0 (com.do1.WeiLaiApp.NIOVehicleWidget; build:2586; iOS 26.3.1) Alamofire/5.9.1",
-      "Authorization": "Bearer 2.0IkLw1IayXSA5CD32/1MdpTe9sF9zhR5BPmTEA3a2JX0=",
-      "Accept-Language": "zh-CN,zh-Hans;q=0.9",
-    };
 
     try {
-      const response = await fetch(url, { headers, method: 'GET' });
+      const validation = validateNioRequestConfig(config);
+      if (!validation.valid) {
+        console.error('Invalid NIO request config:', validation.errors);
+        alert('配置无效：' + validation.errors.join(', '));
+        return false;
+      }
+
+      if (shouldSave) {
+        setNioRequestConfig(config);
+        saveNioRequestConfig(config);
+      }
+      const url = buildNioRequestUrl(config);
+      const response = await fetch(url, { headers: config.headers, method: 'GET' });
       const data = await response.json();
 
       if (data.result_code === 'success' && data.data) {
         const apiData = data.data;
 
         // Map API data to our state
-        setWidgetData(prev => ({
-          ...prev,
-          // Battery
-          batterySoc: apiData.status?.soc_status?.soc ?? prev.batterySoc,
-          batteryRange: apiData.status?.soc_status?.remaining_actual_range ?? prev.batteryRange,
-          totalMileage: apiData.status?.exterior_status?.mileage ?? prev.totalMileage,
-          isCharging: (apiData.status?.soc_status?.charge_state ?? 0) === 1.0,
-
-          // GPS
-          gpsLongitude: apiData.status?.position_status?.longitude ?? prev.gpsLongitude,
-          gpsLatitude: apiData.status?.position_status?.latitude ?? prev.gpsLatitude,
-
-          // Special Modes
-          petMode: (apiData.status?.offcar_mode_status?.pet_mode ?? 0) > 0,
-          powerHoldMode: (apiData.status?.offcar_mode_status?.power_hold_mode ?? 0) > 0,
-          campingMode: (apiData.status?.offcar_mode_status?.camping_mode ?? 0) > 0,
-          defenderMode: (apiData.status?.offcar_mode_status?.defender_mode ?? 0) > 0,
-          remoteVideo: (apiData.status?.offcar_mode_status?.remote_video ?? 0) > 0,
-
-          // Temperature
-          insideTemp: apiData.status?.hvac_status?.temperature ?? prev.insideTemp,
-          outsideTemp: apiData.status?.hvac_status?.outside_temperature ?? prev.outsideTemp,
-          acOn: apiData.status?.hvac_status?.air_conditioner_on ?? prev.acOn,
-
-          // Seat Heating & Ventilation
-          steeringWheelHeat: apiData.status?.heating_status?.steer_wheel_heat_sts ?? prev.steeringWheelHeat,
-          frontLeftHeat: apiData.status?.heating_status?.seat_heat_frnt_le_sts ?? prev.frontLeftHeat,
-          frontRightHeat: apiData.status?.heating_status?.seat_heat_frnt_ri_sts ?? prev.frontRightHeat,
-          rearLeftHeat: apiData.status?.heating_status?.seat_heat_re_le_sts ?? prev.rearLeftHeat,
-          rearRightHeat: apiData.status?.heating_status?.seat_heat_re_ri_sts ?? prev.rearRightHeat,
-          thirdRowLeftHeat: apiData.status?.heating_status?.seat_heat_thrd_le_sts ?? prev.thirdRowLeftHeat,
-          thirdRowRightHeat: apiData.status?.heating_status?.seat_heat_thrd_ri_sts ?? prev.thirdRowRightHeat,
-          frontLeftVent: apiData.status?.heating_status?.seat_vent_frnt_le_sts ?? prev.frontLeftVent,
-          frontRightVent: apiData.status?.heating_status?.seat_vent_frnt_ri_sts ?? prev.frontRightVent,
-          rearLeftVent: apiData.status?.heating_status?.seat_vent_re_le_sts ?? prev.rearLeftVent,
-          rearRightVent: apiData.status?.heating_status?.seat_vent_re_ri_sts ?? prev.rearRightVent,
-          // Charging info
-          chargingPower: apiData.status?.soc_status?.charging_power ?? prev.chargingPower,
-          chargingCurrent: apiData.status?.soc_status?.charging_current ?? prev.chargingCurrent,
-          chargingVoltage: apiData.status?.soc_status?.charging_voltage ?? prev.chargingVoltage,
-          chrgReq: apiData.status?.soc_status?.chrg_req ?? prev.chrgReq,
-
-          // Connection
-          cdcConnected: apiData.status?.connection_status?.cdc_connected ?? prev.cdcConnected,
-          adcConnected: apiData.status?.connection_status?.adc_connected ?? prev.adcConnected,
-          accountId: apiData.status?.offcar_mode_status?.pw_hold_acc_id ?? apiData.status?.maintain_status?.account_id ?? prev.accountId,
-
-          // FOTA
-          fotaVersion: apiData.status?.fota_status?.current_version ?? prev.fotaVersion,
-          fotaPartNumber: apiData.status?.fota_status?.part_number ?? prev.fotaPartNumber,
-          fotaIsLatest: apiData.status?.fota_status?.is_latest ?? prev.fotaIsLatest,
-
-          // Windows
-          frontLeftWindow: apiData.status?.window_status?.win_front_left_posn ?? prev.frontLeftWindow,
-          frontRightWindow: apiData.status?.window_status?.win_front_right_posn ?? prev.frontRightWindow,
-          rearLeftWindow: apiData.status?.window_status?.win_rear_left_posn ?? prev.rearLeftWindow,
-          rearRightWindow: apiData.status?.window_status?.win_rear_right_posn ?? prev.rearRightWindow,
-          frontTrunk: apiData.status?.window_status?.sun_roof_posn ?? prev.frontTrunk,
-          // Door status (1.0 = closed, 0.0 = open)
-          doorFrontLeft: apiData.status?.door_status?.door_ajar_front_left_status ?? prev.doorFrontLeft,
-          doorFrontRight: apiData.status?.door_status?.door_ajar_front_right_status ?? prev.doorFrontRight,
-          doorRearLeft: apiData.status?.door_status?.door_ajar_rear_left_status ?? prev.doorRearLeft,
-          doorRearRight: apiData.status?.door_status?.door_ajar_rear_right_status ?? prev.doorRearRight,
-          engineHood: apiData.status?.door_status?.engine_hood_ajar_status ?? prev.engineHood,
-          tailgate: apiData.status?.door_status?.tailgate_ajar_status ?? prev.tailgate,
-          chargePort: apiData.status?.door_status?.second_charge_port_ajar_status ?? prev.chargePort,
-          // Door lock status
-          isLocked: apiData.status?.door_status?.vehicle_lock_status ?? prev.isLocked,
-        }));
+        setWidgetData(prev => mapNioApiDataToWidgetState(prev, apiData));
 
         setLastUpdate(new Date().toLocaleString());
+        return true;
+      } else {
+        console.error('API returned error:', data);
+        return false;
       }
     } catch (error) {
       console.error('Failed to fetch from NIO API:', error);
       alert('获取数据失败，可能是跨域问题。请在浏览器控制台查看错误信息。');
+      return false;
+    } finally {
+      setUpdating(false);
     }
+  };
 
-    setUpdating(false);
+  const testNioRequestConfig = async (config: NioRequestConfig) => {
+    return updateFromAPI(config, { save: false });
   };
 
   const generateImages = async () => {
@@ -532,7 +348,7 @@ const App: React.FC = () => {
           <div className="flex flex-col items-end gap-[8px]">
             <div className="flex gap-[12px]">
               <button
-                onClick={updateFromAPI}
+                onClick={() => updateFromAPI()}
                 disabled={updating}
                 className="px-[16px] py-[10px] bg-blue-600 text-white rounded font-jetbrains hover:bg-blue-700 disabled:bg-gray-500 disabled:cursor-not-allowed"
               >
@@ -608,6 +424,13 @@ const App: React.FC = () => {
             </div>
           </div>
         </div>
+
+        <NioRequestConfigPanel
+          config={nioRequestConfig}
+          updating={updating}
+          onChange={setNioRequestConfig}
+          onTest={testNioRequestConfig}
+        />
 
         {/* Row 1 - 3 widgets */}
         <div id="widget-row-1" className="flex gap-[16px] mb-[16px]">
