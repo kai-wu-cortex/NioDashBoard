@@ -11,6 +11,7 @@ import SeatHeatingWidget from './components/SeatHeatingWidget';
 import ConnectionWidget from './components/ConnectionWidget';
 import TemperatureWidget from './components/TemperatureWidget';
 import ChargingWidget from './components/ChargingWidget';
+import NioRequestConfigPanel from './components/NioRequestConfigPanel';
 import { GeneratedImage } from './types';
 import { mapNioApiDataToWidgetState, type WidgetDataState } from './utils/mapNioApiData';
 import {
@@ -185,6 +186,10 @@ const App: React.FC = () => {
     } finally {
       setUpdating(false);
     }
+  };
+
+  const testNioRequestConfig = async (config: NioRequestConfig) => {
+    return updateFromAPI(config);
   };
 
   const generateImages = async () => {
@@ -413,6 +418,13 @@ const App: React.FC = () => {
             </div>
           </div>
         </div>
+
+        <NioRequestConfigPanel
+          config={nioRequestConfig}
+          updating={updating}
+          onChange={setNioRequestConfig}
+          onTest={testNioRequestConfig}
+        />
 
         {/* Row 1 - 3 widgets */}
         <div id="widget-row-1" className="flex gap-[16px] mb-[16px]">
